@@ -8,6 +8,7 @@ my $KUBECTL = "/usr/bin/kubectl";
 $ENV{'KUBECONFIG'} = $ARGV[0];
 
 my $DISCOVERY = $ARGV[1];
+my $NAMESPACE = $ARGV[2] || undef;
 
 my $result = {
     data => [],
@@ -16,7 +17,7 @@ my $result = {
 if ($DISCOVERY eq 'containers') {
     my $output = `$KUBECTL get pods -o json`;
     my $outJson = decode_json $output;
-    my $result = discover_containers($outJson);
+    my $result = discover_containers($outJson, $NAMESPACE);
 
     #print Dumper($result);
     print encode_json $result;
@@ -25,7 +26,7 @@ if ($DISCOVERY eq 'containers') {
 if ($DISCOVERY eq 'pods') {
     my $output = `$KUBECTL get pods -o json`;
     my $outJson = decode_json $output;
-    my $result = discover_pods($outJson);
+    my $result = discover_pods($outJson, $NAMESPACE);
 
     #print Dumper($result);
     print encode_json $result;
@@ -43,7 +44,7 @@ if ($DISCOVERY eq 'nodes') {
 if ($DISCOVERY eq 'services') {
     my $output = `$KUBECTL get services -o json`;
     my $outJson = decode_json $output;
-    my $result = discover_services($outJson);
+    my $result = discover_services($outJson, $NAMESPACE);
 
     #print Dumper($result);
     print encode_json $result;
@@ -52,7 +53,7 @@ if ($DISCOVERY eq 'services') {
 if ($DISCOVERY eq 'deployments') {
     my $output = `$KUBECTL get deployments -o json`;
     my $outJson = decode_json $output;
-    my $result = discover_deployments($outJson);
+    my $result = discover_deployments($outJson, $NAMESPACE);
 
     #print Dumper($result);
     print encode_json $result;
@@ -60,12 +61,16 @@ if ($DISCOVERY eq 'deployments') {
 
 sub discover_deployments {
     my $json = shift;
+    my $namespace = shift;
 
     my $result = {
         data => [],              
     };
 
     foreach my $item (@{$json->{items}}) {
+        if (defined $namespace) {
+            next if $namespace ne $item->{metadata}->{namespace};
+        }
         my $discovery = {
             '{#NAME}' => $item->{metadata}->{name},
             '{#NAMESPACE}' => $item->{metadata}->{namespace},                                           
@@ -77,12 +82,16 @@ sub discover_deployments {
 
 sub discover_services {
     my $json = shift;
+    my $namespace = shift;
 
     my $result = {
         data => [],              
     };
 
     foreach my $item (@{$json->{items}}) {
+        if (defined $namespace) {
+            next if $namespace ne $item->{metadata}->{namespace};                      
+        }
         my $discovery = {
             '{#NAME}' => $item->{metadata}->{name},
             '{#NAMESPACE}' => $item->{metadata}->{namespace},
@@ -113,6 +122,7 @@ sub discover_nodes {
 
 sub discover_containers {
     my $json = shift;
+    my $namespace = shift;
     
     my $result = {
         data => [],
@@ -120,6 +130,9 @@ sub discover_containers {
 
     foreach my $item (@{$json->{items}}) {
         foreach my $container (@{$item->{spec}->{containers}}) {
+            if (defined $namespace) {
+                next if $namespace ne $item->{metadata}->{namespace};                      
+            }
             my $discovery = {
                 '{#NAME}' => $item->{metadata}->{name},
                 '{#NAMESPACE}' => $item->{metadata}->{namespace},
@@ -134,12 +147,16 @@ sub discover_containers {
 
 sub discover_pods {
     my $json = shift;
+    my $namespace = shift;
     
     my $result = {
         data => [],                     
     };
 
     foreach my $item (@{$json->{items}}) {
+        if (defined $namespace) {
+            next if $namespace ne $item->{metadata}->{namespace};                                  
+        }
         my $discovery = {
             '{#NAME}' => $item->{metadata}->{name},
             '{#NAMESPACE}' => $item->{metadata}->{namespace},                                                                            

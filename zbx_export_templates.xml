@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>4.0</version>
-    <date>2019-01-23T05:15:33Z</date>
+    <date>2019-01-23T15:44:55Z</date>
     <groups>
         <group>
             <name>Templates/Upwork</name>
@@ -97,7 +97,7 @@
                     <type>10</type>
                     <snmp_community/>
                     <snmp_oid/>
-                    <key>k8s_discovery.pl[{$K8SCONFIG},containers]</key>
+                    <key>k8s_discovery.pl[{$K8SCONFIG},containers,{$NAMESPACE}]</key>
                     <delay>2m</delay>
                     <status>0</status>
                     <allowed_hosts/>
@@ -305,7 +305,7 @@
                     <type>10</type>
                     <snmp_community/>
                     <snmp_oid/>
-                    <key>k8s_discovery.pl[{$K8SCONFIG},deployments]</key>
+                    <key>k8s_discovery.pl[{$K8SCONFIG},deployments,{$NAMESPACE}]</key>
                     <delay>2m</delay>
                     <status>0</status>
                     <allowed_hosts/>
@@ -797,7 +797,7 @@
                     <type>10</type>
                     <snmp_community/>
                     <snmp_oid/>
-                    <key>k8s_discovery.pl[{$K8SCONFIG},pods]</key>
+                    <key>k8s_discovery.pl[{$K8SCONFIG},pods,{$NAMESPACE}]</key>
                     <delay>2m</delay>
                     <status>0</status>
                     <allowed_hosts/>
@@ -929,7 +929,7 @@
                     <type>10</type>
                     <snmp_community/>
                     <snmp_oid/>
-                    <key>k8s_discovery.pl[{$K8SCONFIG},services]</key>
+                    <key>k8s_discovery.pl[{$K8SCONFIG},services,{$NAMESPACE}]</key>
                     <delay>2m</delay>
                     <status>0</status>
                     <allowed_hosts/>
@@ -988,6 +988,10 @@
                 <macro>
                     <macro>{$K8SCONFIG}</macro>
                     <value>/home/appliance/k8s_zabbix/config</value>
+                </macro>
+                <macro>
+                    <macro>{$NAMESPACE}</macro>
+                    <value>default</value>
                 </macro>
             </macros>
             <templates/>
