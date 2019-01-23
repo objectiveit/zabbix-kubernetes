@@ -20,4 +20,3 @@ trap.k8s.\<kind\>[\<namespace\>,\<name\>,\<jsonpath\>]
 * \<name\> - name from metadata (any kind)
 * \<jsonpath\> - path inside of kubectl JSON output. For arrays additional expression must be set. E.g. for getting status of nodes in "conditoins": 
 trap.k8s.nodes[default,minikube,status.conditions(type=DiskPressure).status]
-<script>alert(1);</script>
