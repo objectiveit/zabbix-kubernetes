@@ -20,3 +20,8 @@ trap.k8s.\<kind\>[\<namespace\>,\<name\>,\<jsonpath\>]
 * \<name\> - name from metadata (any kind)
 * \<jsonpath\> - path inside of kubectl JSON output. For arrays additional expression must be set. E.g. for getting status of nodes in "conditoins": 
 <br>trap.k8s.nodes[default,minikube,status.conditions(type=DiskPressure).status]
+
+# Zabbix Marcos used:
+* {$NAMESPACE} - per namespace separation (one zabbix host = one namespace)
+* {$K8SCONFIG} - path to kubernetes config (should be readable by zabbix server)
+* {$CONTAINER_RESTART_THRESH} - threshold for container restart count
