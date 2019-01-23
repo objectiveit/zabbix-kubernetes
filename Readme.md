@@ -7,6 +7,7 @@ zabbix-kubernetes is "plugin" used for Kubernetes monitoring. Easy to deploy and
 1. Copy scripts to zabbix external scripts path
 1. Import Zabbix template
 1. Configure zabbix macros in template with correct path to kubernetes config file (which can be used by kubectl)
+1. Check other macros related to triger thresholds
 1. Create Zabbix API user and assign appropriate permissions. User must have "Admin Role" and has access to host groups with monitored hosts
 1. Check "CONFIG" section in both scripts and set appropriate values for variables
 
