@@ -25,3 +25,4 @@ trap.k8s.\<kind\>[\<namespace\>,\<name\>,\<jsonpath\>]
 * {$NAMESPACE} - per namespace separation (one zabbix host = one namespace)
 * {$K8SCONFIG} - path to kubernetes config (should be readable by zabbix server)
 * {$CONTAINER_RESTART_THRESH} - threshold for container restart count
+* {$DISCOVERY_NODATA_PERIOD} - no data from discovery period for trigger
