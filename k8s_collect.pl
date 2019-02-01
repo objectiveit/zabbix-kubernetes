@@ -22,6 +22,7 @@ my $TOKEN_HEALTHCHECK = 'healthcheck';
 
 my $HOSTNAME = $ARGV[0];
 $ENV{'KUBECONFIG'} = $ARGV[1];
+my $NAMESPACE = $ARGV[2];
 
 #############################################
 # Request to Zabbix API for data to collect #
@@ -82,7 +83,7 @@ if ($respItems->is_success) {
 
 # Get data from Kubernetes
 foreach my $kind ('pods', 'nodes', 'services', 'deployments') {
-    my $output = `$KUBECTL get $kind -o json`;
+    my $output = `$KUBECTL get $kind -o json -n $NAMESPACE`;
     my $outJson = decode_json $output;
     $COLLECTED_DATA{$kind} = $outJson->{items};
 }
