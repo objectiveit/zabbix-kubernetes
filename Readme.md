@@ -22,7 +22,7 @@ trap.k8s.\<kind\>[\<namespace\>,\<name\>,\<jsonpath\>]
 <br>trap.k8s.nodes[default,minikube,status.conditions(type=DiskPressure).status]
 
 # Zabbix Marcos used:
-* {$NAMESPACE} - per namespace separation (one zabbix host = one namespace)
-* {$K8SCONFIG} - path to kubernetes config (should be readable by zabbix server)
+* {$NAMESPACE} - per namespace separation (one zabbix host = one namespace). Multiple namespaces supported (separate with comma)
+* {$K8SCONFIG} - path to kubernetes config (should be readable by zabbix server). Multiple configs supported.
 * {$CONTAINER_RESTART_THRESH} - threshold for container restart count
 * {$DISCOVERY_NODATA_PERIOD} - no data from discovery period for trigger
