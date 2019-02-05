@@ -3,10 +3,10 @@ use strict;
 
 use JSON;
 use LWP::UserAgent;
-use Data::Dumper;
+#use Data::Dumper;
 
 # CONFIG ################################################
-my $APIURL = 'http://127.0.0.1:30080/zabbix/api_jsonrpc.php';
+my $APIURL = 'http://127.0.0.1/zabbix/api_jsonrpc.php';
 my $APIUSER = 'zabbixapi';
 my $APIPASS = 'zabbixapipass';
 my $ZABBIX_SENDER = '/usr/bin/zabbix_sender';
@@ -27,7 +27,6 @@ my %HEALTHZ_KEYs = {
 #########################################################
 
 my $HOSTNAME = $ARGV[0];
-#$ENV{'KUBECONFIG'} = $ARGV[1];
 my @CONFIGS = split /,/,$ARGV[1];
 my @NAMESPACES = split /,/,$ARGV[2];
 
@@ -168,6 +167,7 @@ sub get_value_by_path {
 sub send_to_zabbix {
     my ($tmpFilePath, $to_zabbix) = @_;
     open(my $fh, '>', $tmpFilePath);
+    # map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
     map {print $fh "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix;
     close $fh;
     my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath");

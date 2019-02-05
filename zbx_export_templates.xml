@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>4.0</version>
-    <date>2019-02-01T06:20:19Z</date>
+    <date>2019-02-05T13:56:55Z</date>
     <groups>
         <group>
             <name>Templates/Upwork</name>
@@ -18,6 +18,9 @@
                 </group>
             </groups>
             <applications>
+                <application>
+                    <name>Cluster Health</name>
+                </application>
                 <application>
                     <name>Containers</name>
                 </application>
@@ -357,7 +360,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>30d</lifetime>
+                    <lifetime>0</lifetime>
                     <description/>
                     <item_prototypes>
                         <item_prototype>
@@ -565,7 +568,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>30d</lifetime>
+                    <lifetime>0</lifetime>
                     <description/>
                     <item_prototypes>
                         <item_prototype>
@@ -697,7 +700,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>30d</lifetime>
+                    <lifetime>0</lifetime>
                     <description/>
                     <item_prototypes>
                         <item_prototype>
@@ -1057,7 +1060,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>30d</lifetime>
+                    <lifetime>0</lifetime>
                     <description/>
                     <item_prototypes>
                         <item_prototype>
@@ -1189,7 +1192,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>30d</lifetime>
+                    <lifetime>1h</lifetime>
                     <description/>
                     <item_prototypes/>
                     <trigger_prototypes/>
@@ -1215,8 +1218,49 @@
                     <verify_host>0</verify_host>
                 </discovery_rule>
             </discovery_rules>
-            <httptests/>
+            <httptests>
+                <httptest>
+                    <name>Health check</name>
+                    <application>
+                        <name>Cluster Health</name>
+                    </application>
+                    <delay>1m</delay>
+                    <attempts>1</attempts>
+                    <agent>Zabbix</agent>
+                    <http_proxy/>
+                    <variables/>
+                    <headers/>
+                    <status>0</status>
+                    <authentication>0</authentication>
+                    <http_user/>
+                    <http_password/>
+                    <verify_peer>0</verify_peer>
+                    <verify_host>0</verify_host>
+                    <ssl_cert_file/>
+                    <ssl_key_file/>
+                    <ssl_key_password/>
+                    <steps>
+                        <step>
+                            <name>GET /healthz</name>
+                            <url>https://{HOST.CONN}:{$API_PORT}/healthz</url>
+                            <query_fields/>
+                            <posts/>
+                            <variables/>
+                            <headers/>
+                            <follow_redirects>0</follow_redirects>
+                            <retrieve_mode>0</retrieve_mode>
+                            <timeout>15s</timeout>
+                            <required>ok</required>
+                            <status_codes>200</status_codes>
+                        </step>
+                    </steps>
+                </httptest>
+            </httptests>
             <macros>
+                <macro>
+                    <macro>{$API_PORT}</macro>
+                    <value>8443</value>
+                </macro>
                 <macro>
                     <macro>{$CONTAINER_RESTAR_THRESH}</macro>
                     <value>100</value>
@@ -1239,6 +1283,22 @@
         </template>
     </templates>
     <triggers>
+        <trigger>
+            <expression>{Template Kubernetes:web.test.fail[Health check].last()}&lt;&gt;0</expression>
+            <recovery_mode>0</recovery_mode>
+            <recovery_expression/>
+            <name>Cluster Health is not OK</name>
+            <correlation_mode>0</correlation_mode>
+            <correlation_tag/>
+            <url/>
+            <status>0</status>
+            <priority>5</priority>
+            <description/>
+            <type>0</type>
+            <manual_close>0</manual_close>
+            <dependencies/>
+            <tags/>
+        </trigger>
         <trigger>
             <expression>{Template Kubernetes:k8s_collect.pl[{HOST.HOST},{$K8SCONFIG},{$NAMESPACE}].str(failed: 0)}=0</expression>
             <recovery_mode>0</recovery_mode>
