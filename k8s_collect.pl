@@ -6,7 +6,7 @@ use LWP::UserAgent;
 use Data::Dumper;
 
 # CONFIG ################################################
-my $APIURL = 'http://127.0.0.1/zabbix/api_jsonrpc.php';
+my $APIURL = 'http://127.0.0.1:30080/zabbix/api_jsonrpc.php';
 my $APIUSER = 'zabbixapi';
 my $APIPASS = 'zabbixapipass';
 my $ZABBIX_SENDER = '/usr/bin/zabbix_sender';
@@ -15,14 +15,21 @@ my $ZABBIX_PORT = '10051';
 my $KUBECTL = '/usr/bin/kubectl';
 my $TMP_FILE_PATH = '/tmp/send_to_zabbix.data';
 
-# TOKENS ################################################
+# LANG TOKENS ###########################################
 my $ITEM_REGEXP = '^trap\.k8s\.';
 my $TOKEN_HEALTHCHECK = 'healthcheck';
+my %HEALTHZ_KEYs = {
+    'healthz'               => 'trap.k8s.healthz',
+    'bootstrap-controller'  => 'trap.k8s.bootstrap-controller',
+    'third-party-resources' => 'trap.k8s.third-party-resources',
+    'bootstrap-roles'       => 'trap.k8s.bootstrap-roles',
+};
 #########################################################
 
 my $HOSTNAME = $ARGV[0];
-$ENV{'KUBECONFIG'} = $ARGV[1];
-my $NAMESPACE = $ARGV[2];
+#$ENV{'KUBECONFIG'} = $ARGV[1];
+my @CONFIGS = split /,/,$ARGV[1];
+my @NAMESPACES = split /,/,$ARGV[2];
 
 #############################################
 # Request to Zabbix API for data to collect #
@@ -74,7 +81,7 @@ if ($respItems->is_success) {
     my $responseJson = decode_json $respItems->content;
     @ITEMS = map {$_->{key_}} @{$responseJson->{result}}
 } else {
-    die "Zabbix API HTTP Connection Error";
+    die "Zabbix API HTTP Co nnection Error";
 }
 
 ################
@@ -82,52 +89,34 @@ if ($respItems->is_success) {
 ################
 
 # Get data from Kubernetes
-foreach my $kind ('pods', 'nodes', 'services', 'deployments') {
-    my $output = `$KUBECTL get $kind -o json -n $NAMESPACE`;
-    my $outJson = decode_json $output;
-    $COLLECTED_DATA{$kind} = $outJson->{items};
-}
+foreach my $config(@CONFIGS) {
+    $ENV{'KUBECONFIG'} = $config;
+    my %collected_data;
+    my %to_zabbix;
+    foreach my $namespace (@NAMESPACES) {
+        foreach my $kind ('pods', 'nodes', 'services', 'deployments') {
+            my $output = `$KUBECTL get $kind -o json -n $namespace`;
+            my $outJson = decode_json $output;
+            $collected_data{$kind} = $outJson->{items};
+        }
 
-# Item keys tokenizer
-foreach my $itemKey (@ITEMS) {
-    my ($kind, $namespace, $name, $path) = $itemKey =~ m/$ITEM_REGEXP(.*)\[(.*),(.*),(.*)\]/;
-    next if (!defined $kind || !defined $name || !defined $path);
+        # Item keys tokenizer
+        foreach my $itemKey (@ITEMS) {
+            my ($kind, $namespace, $name, $path) = $itemKey =~ m/$ITEM_REGEXP(.*)\[(.*),(.*),(.*)\]/;
+            next if (!defined $kind || !defined $name || !defined $path);
 
-    my $value;
-    if ($name eq $TOKEN_HEALTHCHECK) {
-        my (@json) = grep {$_->{metadata}->{namespace} eq $namespace} @{$COLLECTED_DATA{$kind}};
-        $value = health_check_pods(\@json, $kind) if ($kind eq 'pods');
-    } else {
-        my @path = split('\.',$path);
-        my ($json) = grep {$_->{metadata}->{name} eq $name} @{$COLLECTED_DATA{$kind}};
-        $value = get_value_by_path($json, \@path);
+            my @path = split('\.',$path);
+            my ($json) = grep {$_->{metadata}->{name} eq $name} @{$collected_data{$kind}};
+            my $value = get_value_by_path($json, \@path);
+            $to_zabbix{$itemKey} = $value;
+        }
+        # Send collected data to Zabbix
+        send_to_zabbix($TMP_FILE_PATH,\%to_zabbix);
     }
-    $TO_ZABBIX{$itemKey} = $value;
 }
-
-# Send collected data to Zabbix
-send_to_zabbix();
-
 #########
 # Funcs #
 #########
-
-# Health check for pods
-sub health_check_pods {
-    my ($json, $kind) = @_;
-
-    if($kind eq 'pods') {
-        my $inReadyStatus = 0;
-        my $numberOfPods = scalar @$json;
-        foreach my $pod (@$json) {
-            my @ready = grep {$_->{type} eq 'Ready'} @{$pod->{status}->{conditions}};
-            $inReadyStatus++ if ($ready[0]->{status} eq 'True');
-        }
-        ($inReadyStatus == $numberOfPods) ? return "OK" : return "Only $inReadyStatus of $numberOfPods are in Ready state";
-    }
-
-}
-
 # Recursively parse JSON path
 sub get_value_by_path {
     my ($json, $path) = @_;
@@ -177,9 +166,10 @@ sub get_value_by_path {
 }
 
 sub send_to_zabbix {
-    open(my $fh, '>', $TMP_FILE_PATH);
-    map {print $fh "$HOSTNAME $_ $TO_ZABBIX{$_}\n"} keys %TO_ZABBIX;
+    my ($tmpFilePath, $to_zabbix) = @_;
+    open(my $fh, '>', $tmpFilePath);
+    map {print $fh "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix;
     close $fh;
-    my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $TMP_FILE_PATH");
+    my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath");
     print $ret;
 }
