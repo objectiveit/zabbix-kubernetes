@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>4.0</version>
-    <date>2019-02-05T13:56:55Z</date>
+    <date>2019-02-06T13:27:36Z</date>
     <groups>
         <group>
             <name>Templates/Upwork</name>
@@ -502,7 +502,7 @@
                             <tags/>
                         </trigger_prototype>
                         <trigger_prototype>
-                            <expression>{Template Kubernetes:trap.k8s.pods[{#NAMESPACE},{#NAME},status.containerStatuses(name={#CONTAINER}).restartCount].last()}&gt;{$CONTAINER_RESTAR_THRESH}</expression>
+                            <expression>{Template Kubernetes:trap.k8s.pods[{#NAMESPACE},{#NAME},status.containerStatuses(name={#CONTAINER}).restartCount].delta(600)}&gt;10</expression>
                             <recovery_mode>0</recovery_mode>
                             <recovery_expression/>
                             <name>Pod: ns:{#NAMESPACE}; name:{#NAME}; container:{#CONTAINER} restart count &gt; {$CONTAINER_RESTAR_THRESH}</name>
@@ -568,7 +568,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>0</lifetime>
+                    <lifetime>7d</lifetime>
                     <description/>
                     <item_prototypes>
                         <item_prototype>
@@ -676,7 +676,7 @@
                     <type>10</type>
                     <snmp_community/>
                     <snmp_oid/>
-                    <key>k8s_discovery.pl[{$K8SCONFIG},nodes]</key>
+                    <key>k8s_discovery.pl[{$K8SCONFIG},nodes,none,{HOST.HOST}]</key>
                     <delay>2m</delay>
                     <status>0</status>
                     <allowed_hosts/>
@@ -700,7 +700,7 @@
                         <formula/>
                         <conditions/>
                     </filter>
-                    <lifetime>0</lifetime>
+                    <lifetime>30d</lifetime>
                     <description/>
                     <item_prototypes>
                         <item_prototype>

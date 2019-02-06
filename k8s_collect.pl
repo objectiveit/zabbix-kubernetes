@@ -96,7 +96,7 @@ foreach my $config(@CONFIGS) {
         foreach my $kind ('pods', 'nodes', 'services', 'deployments') {
             my $output = `$KUBECTL get $kind -o json -n $namespace`;
             my $outJson = decode_json $output;
-            $collected_data{$kind} = $outJson->{items};
+            push @{$collected_data{$kind}}, @{$outJson->{items}};
         }
 
         # Item keys tokenizer
@@ -167,7 +167,7 @@ sub get_value_by_path {
 sub send_to_zabbix {
     my ($tmpFilePath, $to_zabbix) = @_;
     open(my $fh, '>', $tmpFilePath);
-    # map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
+    #map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
     map {print $fh "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix;
     close $fh;
     my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath");
