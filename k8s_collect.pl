@@ -6,7 +6,7 @@ use LWP::UserAgent;
 #use Data::Dumper;
 
 # CONFIG ################################################
-my $APIURL = 'http://127.0.0.1/zabbix/api_jsonrpc.php';
+my $APIURL = 'http://127.0.0.1:30080/zabbix/api_jsonrpc.php';
 my $APIUSER = 'zabbixapi';
 my $APIPASS = 'zabbixapipass';
 my $ZABBIX_SENDER = '/usr/bin/zabbix_sender';
@@ -28,7 +28,7 @@ my %HEALTHZ_KEYs = {
 
 my $HOSTNAME = $ARGV[0];
 my @CONFIGS = split /,/,$ARGV[1];
-my @NAMESPACES = split /,/,$ARGV[2];
+my @NAMESPACES = split /,/,$ARGV[2].',none';
 
 #############################################
 # Request to Zabbix API for data to collect #
@@ -38,6 +38,7 @@ my $AUTH = '';
 my @ITEMS;
 my %COLLECTED_DATA;
 my %TO_ZABBIX;
+my %NAMESPACES_HASH = map {$_ => 1} @NAMESPACES;
 
 my $ua = LWP::UserAgent->new();
 $ua-> default_header('Content-Type' => 'application/json-rpc');
@@ -88,31 +89,46 @@ if ($respItems->is_success) {
 ################
 
 # Get data from Kubernetes
+my %collected_data;
 foreach my $config(@CONFIGS) {
     $ENV{'KUBECONFIG'} = $config;
-    my %collected_data;
-    my %to_zabbix;
-    foreach my $namespace (@NAMESPACES) {
-        foreach my $kind ('pods', 'nodes', 'services', 'deployments') {
-            my $output = `$KUBECTL get $kind -o json -n $namespace`;
-            my $outJson = decode_json $output;
-            push @{$collected_data{$kind}}, @{$outJson->{items}};
-        }
 
-        # Item keys tokenizer
-        foreach my $itemKey (@ITEMS) {
-            my ($kind, $namespace, $name, $path) = $itemKey =~ m/$ITEM_REGEXP(.*)\[(.*),(.*),(.*)\]/;
-            next if (!defined $kind || !defined $name || !defined $path);
-
-            my @path = split('\.',$path);
-            my ($json) = grep {$_->{metadata}->{name} eq $name} @{$collected_data{$kind}};
-            my $value = get_value_by_path($json, \@path);
-            $to_zabbix{$itemKey} = $value;
-        }
-        # Send collected data to Zabbix
-        send_to_zabbix($TMP_FILE_PATH,\%to_zabbix);
+    foreach my $kind ('pods', 'nodes', 'services', 'deployments', 'apiservices', 'componentstatuses') {
+        my $output = `$KUBECTL get $kind -o json --all-namespaces=true`;
+        my $outJson = decode_json $output;
+        push @{$collected_data{$kind}}, @{$outJson->{items}};
     }
 }
+
+# Item keys tokenizer
+foreach my $itemKey (@ITEMS) {
+    my ($kind, $namespace, $name, $path) = $itemKey =~ m/$ITEM_REGEXP(.*)\[(.*),(.*),(.*)\]/;
+    next if (!defined $kind || !defined $name || !defined $path);
+
+    my @path = split('\.',$path);
+
+    my $dataOfKind = $collected_data{$kind};
+    foreach my $element (@$dataOfKind) {
+        my $value;
+
+        # if element has namespace, check if we really need this one and if its equal to current item
+        if (defined $element->{metadata}->{namespace}) {
+            next unless (
+                defined $NAMESPACES_HASH{$element->{metadata}->{namespace}}
+                and $element->{metadata}->{namespace} eq $namespace
+            );
+        }
+
+        next unless ($element->{metadata}->{name} eq $name);
+
+        my $value = get_value_by_path($element, \@path);
+        $TO_ZABBIX{$itemKey} = $value;
+    }
+}
+
+# Send collected data to Zabbix
+send_to_zabbix($TMP_FILE_PATH,\%TO_ZABBIX);
+
 #########
 # Funcs #
 #########
@@ -167,8 +183,8 @@ sub get_value_by_path {
 sub send_to_zabbix {
     my ($tmpFilePath, $to_zabbix) = @_;
     open(my $fh, '>', $tmpFilePath);
-    #map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
-    map {print $fh "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix;
+    map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
+    #map {print $fh "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix;
     close $fh;
     my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath");
     print $ret;

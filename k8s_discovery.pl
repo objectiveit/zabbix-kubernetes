@@ -22,15 +22,30 @@ my $ZABBIXKEY_NODATA_SERVICES = 'trap.k8s.discovery.nodata.services';
 my $ZABBIXKEY_NODATA_DEPLOYMENTS = 'trap.k8s.discovery.nodata.deployments';
 my $ZABBIXKEY_NODATA_NODES = 'trap.k8s.discovery.nodata.nodes';
 
-my $RESULT = {
-    data => [],
-};
+#my $RESULT = {
+#    data => [],
+#};
+my @RESULT;
 my $ZABBIXKEY;
 
 foreach my $config (@CONFIGS) {
     $ENV{'KUBECONFIG'} = $config;
     foreach my $ns (@NAMESPACES) {
-        if ($DISCOVERY eq 'containers') {
+        if ($DISCOVERY eq 'apiservices') {
+            my $output = `$KUBECTL get apiservices -o json -n $ns`;
+            my $outJson = decode_json $output;
+            my $result = discover_apiservices($outJson);
+
+            $ZABBIXKEY = $ZABBIXKEY_NODATA_CONTAINERS;
+        }
+        elsif ($DISCOVERY eq 'componentstatuses') {
+            my $output = `$KUBECTL get componentstatuses -o json -n $ns`;
+            my $outJson = decode_json $output;
+            my $result = discover_componentstatuses($outJson);
+
+            $ZABBIXKEY = $ZABBIXKEY_NODATA_CONTAINERS;
+        }
+        elsif ($DISCOVERY eq 'containers') {
             my $output = `$KUBECTL get pods -o json -n $ns`;
             my $outJson = decode_json $output;
             my $result = discover_containers($outJson);
@@ -81,8 +96,57 @@ foreach my $config (@CONFIGS) {
 }
 
 # Report to Zabbix and print out discovery data
-(scalar @{$RESULT->{data}} == 0) ? report_to_zabbix($ZABBIXKEY, 1) : report_to_zabbix($ZABBIXKEY, 0);
-print encode_json $RESULT;
+(length @RESULT == 0) ? report_to_zabbix($ZABBIXKEY, 1) : report_to_zabbix($ZABBIXKEY, 0);
+print encode_json get_uniq();
+
+sub get_uniq {
+    my %uniq = ();
+
+    foreach my $value (@RESULT) {
+        my $key = "";
+        
+        if (defined $value->{'{#NAMESPACE}'}) {
+            $key .= $value->{'{#NAMESPACE}'} . '::' 
+        }
+        
+        $key .= $value->{'{#NAME}'};
+        next if defined $uniq{$key};
+        $uniq{$key} = $value;
+    }
+
+    my $toZabbix = {
+        data => [],
+    };
+
+    push @{$toZabbix->{data}},values %uniq;
+
+    return $toZabbix;
+}
+
+sub discover_apiservices {
+    my $json = shift;
+
+    foreach my $item (@{$json->{items}}) {
+        my $discovery = {
+            '{#NAME}' => $item->{metadata}->{name},
+        };
+        push @RESULT,$discovery;
+    }
+    return;
+}
+
+sub discover_componentstatuses {
+    my $json = shift;
+
+    foreach my $item (@{$json->{items}}) {
+        my $discovery = {
+            '{#NAME}' => $item->{metadata}->{name},
+        };
+        push @RESULT,$discovery;
+    }
+
+    return;
+}
 
 sub discover_deployments {
     my $json = shift;
@@ -92,7 +156,7 @@ sub discover_deployments {
             '{#NAME}' => $item->{metadata}->{name},
             '{#NAMESPACE}' => $item->{metadata}->{namespace},                                           
         };
-        push @{$RESULT->{data}},$discovery;                      
+        push @RESULT,$discovery;                      
     }
     return;
 }
@@ -105,7 +169,7 @@ sub discover_services {
             '{#NAME}' => $item->{metadata}->{name},
             '{#NAMESPACE}' => $item->{metadata}->{namespace},
         };
-        push @{$RESULT->{data}},$discovery;
+        push @RESULT,$discovery;
                       
     }
     return;
@@ -118,7 +182,7 @@ sub discover_nodes {
         my $discovery = {
             '{#NAME}' => $item->{metadata}->{name},
         };
-        push @{$RESULT->{data}},$discovery;
+        push @RESULT,$discovery;
     }
 
     return;
@@ -135,7 +199,7 @@ sub discover_containers {
                 '{#NAMESPACE}' => $item->{metadata}->{namespace},
                 '{#CONTAINER}' => $container->{name},
             };
-            push @{$RESULT->{data}},$discovery;
+            push @RESULT,$discovery;
         }
     }
 
@@ -154,7 +218,7 @@ sub discover_pods {
             '{#NAME}' => $item->{metadata}->{name},
             '{#NAMESPACE}' => $item->{metadata}->{namespace},                                                                            
         };
-        push @{$RESULT->{data}},$discovery;
+        push @RESULT,$discovery;
     }
     return;
 }
