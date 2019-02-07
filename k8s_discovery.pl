@@ -21,29 +21,36 @@ my $ZABBIXKEY_NODATA_CONTAINERS = 'trap.k8s.discovery.nodata.containers';
 my $ZABBIXKEY_NODATA_SERVICES = 'trap.k8s.discovery.nodata.services';
 my $ZABBIXKEY_NODATA_DEPLOYMENTS = 'trap.k8s.discovery.nodata.deployments';
 my $ZABBIXKEY_NODATA_NODES = 'trap.k8s.discovery.nodata.nodes';
+my $ZABBIXKEY_NODATA_APISERVICES = 'trap.k8s.discovery.nodata.apiservices';
+my $ZABBIXKEY_NODATA_COMPONENTSTATUSES = 'trap.k8s.discovery.nodata.componentstatuses';
+my $ZABBIXKEY_NODATA_CLUSTERS = 'trap.k8s.discovery.nodata.nodes';
 
-#my $RESULT = {
-#    data => [],
-#};
 my @RESULT;
 my $ZABBIXKEY;
 
 foreach my $config (@CONFIGS) {
     $ENV{'KUBECONFIG'} = $config;
     foreach my $ns (@NAMESPACES) {
-        if ($DISCOVERY eq 'apiservices') {
+        if ($DISCOVERY eq 'clusters') {
+            my $output = `$KUBECTL config view -o json -n $ns`;
+            my $outJson = decode_json $output;
+            my $result = discover_clusters($outJson);
+
+            $ZABBIXKEY = $ZABBIXKEY_NODATA_CLUSTERS;
+        }
+        elsif ($DISCOVERY eq 'apiservices') {
             my $output = `$KUBECTL get apiservices -o json -n $ns`;
             my $outJson = decode_json $output;
             my $result = discover_apiservices($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_CONTAINERS;
+            $ZABBIXKEY = $ZABBIXKEY_NODATA_APISERVICES;
         }
         elsif ($DISCOVERY eq 'componentstatuses') {
             my $output = `$KUBECTL get componentstatuses -o json -n $ns`;
             my $outJson = decode_json $output;
             my $result = discover_componentstatuses($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_CONTAINERS;
+            $ZABBIXKEY = $ZABBIXKEY_NODATA_COMPONENTSTATUSES;
         }
         elsif ($DISCOVERY eq 'containers') {
             my $output = `$KUBECTL get pods -o json -n $ns`;
@@ -121,6 +128,18 @@ sub get_uniq {
     push @{$toZabbix->{data}},values %uniq;
 
     return $toZabbix;
+}
+
+sub discover_clusters {
+    my $json = shift;
+
+    foreach my $item (@{$json->{clusters}}) {
+        my $discovery = {
+            '{#NAME}' => $item->{name},
+            '{#APIURL}' => $item->{cluster}->{server},
+        };
+        push @RESULT,$discovery;
+    }
 }
 
 sub discover_apiservices {
