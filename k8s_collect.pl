@@ -17,13 +17,14 @@ my $TMP_FILE_PATH = '/tmp/send_to_zabbix.data';
 
 # LANG TOKENS ###########################################
 my $ITEM_REGEXP = '^trap\.k8s\.';
-my $TOKEN_HEALTHCHECK = 'healthcheck';
-my %HEALTHZ_KEYs = {
-    'healthz'               => 'trap.k8s.healthz',
-    'bootstrap-controller'  => 'trap.k8s.bootstrap-controller',
-    'third-party-resources' => 'trap.k8s.third-party-resources',
-    'bootstrap-roles'       => 'trap.k8s.bootstrap-roles',
-};
+#########################################################
+# ITEMS WITH POSSIBLE EMPTY VALUES
+my @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES = (
+    'status\.containerStatuses(name=.*)\.restartCount',
+    'status\.containerStatuses(name=.*)\.ready',
+    'status\.reason',
+);
+
 #########################################################
 
 my $HOSTNAME = $ARGV[0];
@@ -39,7 +40,7 @@ my @ITEMS;
 my %COLLECTED_DATA;
 my %TO_ZABBIX;
 my %NAMESPACES_HASH = map {$_ => 1} @NAMESPACES;
-
+my %JSON_PATHS_W_POSSIBLE_EMPTY_VALUES = map {$_ => 1} @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES; 
 my $ua = LWP::UserAgent->new();
 $ua-> default_header('Content-Type' => 'application/json-rpc');
 # Auth ######################################
@@ -123,6 +124,7 @@ foreach my $itemKey (@ITEMS) {
 
         my $value = get_value_by_path($element, \@path);
         $TO_ZABBIX{$itemKey} = $value;
+        last;
     }
 }
 
@@ -164,7 +166,7 @@ sub get_value_by_path {
             if (defined $index) {
                 get_value_by_path($json->{$element}->[$index], $path);
             } else {
-                return "JSON path is incorrect (inside array)";
+                return "JSON path array condition is incorrect";
             }
 
         } elsif(ref $json->{$element} eq 'HASH') {
@@ -176,7 +178,7 @@ sub get_value_by_path {
         }
 
     } else {
-        return $json->{$element};
+        (defined $json->{$element}) ? return $json->{$element} : return "JSON path is incorrect";
     }
 }
 
@@ -184,7 +186,14 @@ sub send_to_zabbix {
     my ($tmpFilePath, $to_zabbix) = @_;
     open(my $fh, '>', $tmpFilePath);
     #map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
-    map {print $fh "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix;
+    foreach my $to_z (keys %$to_zabbix) {
+        if ($to_zabbix->{$to_z} eq 'JSON path is incorrect') {
+            my @isNoValueAllowed = grep {$to_z =~ /$_/} @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES;
+            next if (scalar @isNoValueAllowed > 0);
+        }
+        print $fh "$HOSTNAME $to_z $to_zabbix->{$to_z}\n";
+        #print "$HOSTNAME $to_z $to_zabbix->{$to_z}\n";
+    }
     close $fh;
     my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath");
     print $ret;
