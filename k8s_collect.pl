@@ -13,10 +13,11 @@ my $ZABBIX_SENDER = '/usr/bin/zabbix_sender';
 my $ZABBIX_SERVER = '127.0.0.1';
 my $ZABBIX_PORT = '10051';
 my $KUBECTL = '/usr/bin/kubectl';
-my $TMP_FILE_PATH = '/tmp/send_to_zabbix.data';
+my $TMP_FILE_PATH = '/tmp/send_to_zabbix_'. int(rand(1000000000)) .'.data';
 
 # LANG TOKENS ###########################################
 my $ITEM_REGEXP = '^trap\.k8s\.';
+my $JSON_PATH_NO_VALUE = 'No value';
 #########################################################
 # ITEMS WITH POSSIBLE EMPTY VALUES
 my @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES = (
@@ -166,19 +167,17 @@ sub get_value_by_path {
             if (defined $index) {
                 get_value_by_path($json->{$element}->[$index], $path);
             } else {
-                return "JSON path array condition is incorrect";
+                return $JSON_PATH_NO_VALUE;
             }
 
         } elsif(ref $json->{$element} eq 'HASH') {
-
             get_value_by_path($json->{$element}, $path);
-
         } else {
-            return "JSON path is incorrect";
+            return $JSON_PATH_NO_VALUE;
         }
 
     } else {
-        (defined $json->{$element}) ? return $json->{$element} : return "JSON path is incorrect";
+        (defined $json->{$element}) ? return $json->{$element} : return $JSON_PATH_NO_VALUE;
     }
 }
 
@@ -187,7 +186,7 @@ sub send_to_zabbix {
     open(my $fh, '>', $tmpFilePath);
     #map {print "$HOSTNAME $_ $to_zabbix->{$_}\n"} keys %$to_zabbix; # DEBUG
     foreach my $to_z (keys %$to_zabbix) {
-        if ($to_zabbix->{$to_z} eq 'JSON path is incorrect') {
+        if ($to_zabbix->{$to_z} eq $JSON_PATH_NO_VALUE) {
             my @isNoValueAllowed = grep {$to_z =~ /$_/} @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES;
             next if (scalar @isNoValueAllowed > 0);
         }
