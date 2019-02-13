@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>4.0</version>
-    <date>2019-02-10T16:20:43Z</date>
+    <date>2019-02-13T04:00:34Z</date>
     <groups>
         <group>
             <name>Templates/Upwork</name>
@@ -1644,6 +1644,66 @@
                             <master_item/>
                         </item_prototype>
                         <item_prototype>
+                            <name>Pod: ns[{#NAMESPACE}] name[{#NAME}] Phase</name>
+                            <type>2</type>
+                            <snmp_community/>
+                            <snmp_oid/>
+                            <key>trap.k8s.pods[{#NAMESPACE},{#NAME},status.phase]</key>
+                            <delay>0</delay>
+                            <history>90d</history>
+                            <trends>0</trends>
+                            <status>0</status>
+                            <value_type>4</value_type>
+                            <allowed_hosts/>
+                            <units/>
+                            <snmpv3_contextname/>
+                            <snmpv3_securityname/>
+                            <snmpv3_securitylevel>0</snmpv3_securitylevel>
+                            <snmpv3_authprotocol>0</snmpv3_authprotocol>
+                            <snmpv3_authpassphrase/>
+                            <snmpv3_privprotocol>0</snmpv3_privprotocol>
+                            <snmpv3_privpassphrase/>
+                            <params/>
+                            <ipmi_sensor/>
+                            <authtype>0</authtype>
+                            <username/>
+                            <password/>
+                            <publickey/>
+                            <privatekey/>
+                            <port/>
+                            <description/>
+                            <inventory_link>0</inventory_link>
+                            <applications>
+                                <application>
+                                    <name>Pods</name>
+                                </application>
+                            </applications>
+                            <valuemap/>
+                            <logtimefmt/>
+                            <preprocessing/>
+                            <jmx_endpoint/>
+                            <timeout>3s</timeout>
+                            <url/>
+                            <query_fields/>
+                            <posts/>
+                            <status_codes>200</status_codes>
+                            <follow_redirects>1</follow_redirects>
+                            <post_type>0</post_type>
+                            <http_proxy/>
+                            <headers/>
+                            <retrieve_mode>0</retrieve_mode>
+                            <request_method>0</request_method>
+                            <output_format>0</output_format>
+                            <allow_traps>0</allow_traps>
+                            <ssl_cert_file/>
+                            <ssl_key_file/>
+                            <ssl_key_password/>
+                            <verify_peer>0</verify_peer>
+                            <verify_host>0</verify_host>
+                            <application_prototypes/>
+                            <master_item/>
+                        </item_prototype>
+                        <item_prototype>
                             <name>Pod: ns[{#NAMESPACE}] name[{#NAME}] Status Failed, Reason Evicted</name>
                             <type>2</type>
                             <snmp_community/>
@@ -1706,15 +1766,47 @@
                     </item_prototypes>
                     <trigger_prototypes>
                         <trigger_prototype>
-                            <expression>{Template Kubernetes:trap.k8s.pods[{#NAMESPACE},{#NAME},status.conditions(type=Ready).status].str(True)}=0</expression>
+                            <expression>{Template Kubernetes:trap.k8s.pods[{#NAMESPACE},{#NAME},status.phase].str(CrashLoopBackOff)}=1</expression>
                             <recovery_mode>0</recovery_mode>
                             <recovery_expression/>
-                            <name>Pod ns:{#NAMESPACE}; name:{#NAME} is not in Ready State</name>
+                            <name>Pod ns:{#NAMESPACE}; name:{#NAME} phase &quot;CrashLoopBackOff&quot;</name>
                             <correlation_mode>0</correlation_mode>
                             <correlation_tag/>
                             <url/>
                             <status>0</status>
-                            <priority>3</priority>
+                            <priority>4</priority>
+                            <description/>
+                            <type>0</type>
+                            <manual_close>0</manual_close>
+                            <dependencies/>
+                            <tags/>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <expression>{Template Kubernetes:trap.k8s.pods[{#NAMESPACE},{#NAME},status.phase].str(Failed)}=1</expression>
+                            <recovery_mode>0</recovery_mode>
+                            <recovery_expression/>
+                            <name>Pod ns:{#NAMESPACE}; name:{#NAME} phase &quot;Failed&quot;</name>
+                            <correlation_mode>0</correlation_mode>
+                            <correlation_tag/>
+                            <url/>
+                            <status>0</status>
+                            <priority>4</priority>
+                            <description/>
+                            <type>0</type>
+                            <manual_close>0</manual_close>
+                            <dependencies/>
+                            <tags/>
+                        </trigger_prototype>
+                        <trigger_prototype>
+                            <expression>{Template Kubernetes:trap.k8s.pods[{#NAMESPACE},{#NAME},status.phase].str(Unknown)}=1</expression>
+                            <recovery_mode>0</recovery_mode>
+                            <recovery_expression/>
+                            <name>Pod ns:{#NAMESPACE}; name:{#NAME} phase &quot;Unknown&quot;</name>
+                            <correlation_mode>0</correlation_mode>
+                            <correlation_tag/>
+                            <url/>
+                            <status>0</status>
+                            <priority>4</priority>
                             <description/>
                             <type>0</type>
                             <manual_close>0</manual_close>
@@ -1814,44 +1906,7 @@
                     <verify_host>0</verify_host>
                 </discovery_rule>
             </discovery_rules>
-            <httptests>
-                <httptest>
-                    <name>Health check</name>
-                    <application>
-                        <name>Cluster Health</name>
-                    </application>
-                    <delay>1m</delay>
-                    <attempts>1</attempts>
-                    <agent>Zabbix</agent>
-                    <http_proxy/>
-                    <variables/>
-                    <headers/>
-                    <status>0</status>
-                    <authentication>0</authentication>
-                    <http_user/>
-                    <http_password/>
-                    <verify_peer>0</verify_peer>
-                    <verify_host>0</verify_host>
-                    <ssl_cert_file/>
-                    <ssl_key_file/>
-                    <ssl_key_password/>
-                    <steps>
-                        <step>
-                            <name>GET /healthz</name>
-                            <url>https://{HOST.CONN}:{$API_PORT}/healthz</url>
-                            <query_fields/>
-                            <posts/>
-                            <variables/>
-                            <headers/>
-                            <follow_redirects>0</follow_redirects>
-                            <retrieve_mode>0</retrieve_mode>
-                            <timeout>15s</timeout>
-                            <required>ok</required>
-                            <status_codes>200</status_codes>
-                        </step>
-                    </steps>
-                </httptest>
-            </httptests>
+            <httptests/>
             <macros>
                 <macro>
                     <macro>{$API_PORT}</macro>
@@ -1879,22 +1934,6 @@
         </template>
     </templates>
     <triggers>
-        <trigger>
-            <expression>{Template Kubernetes:web.test.fail[Health check].last()}&lt;&gt;0</expression>
-            <recovery_mode>0</recovery_mode>
-            <recovery_expression/>
-            <name>Cluster Health is not OK</name>
-            <correlation_mode>0</correlation_mode>
-            <correlation_tag/>
-            <url/>
-            <status>0</status>
-            <priority>5</priority>
-            <description/>
-            <type>0</type>
-            <manual_close>0</manual_close>
-            <dependencies/>
-            <tags/>
-        </trigger>
         <trigger>
             <expression>{Template Kubernetes:k8s_collect.pl[{HOST.HOST},{$K8SCONFIG},{$NAMESPACE}].str(failed: 0,1)}=0 and {Template Kubernetes:k8s_collect.pl[{HOST.HOST},{$K8SCONFIG},{$NAMESPACE}].str(failed: 0,2)}=0 and {Template Kubernetes:k8s_collect.pl[{HOST.HOST},{$K8SCONFIG},{$NAMESPACE}].str(failed: 0,3)}=0</expression>
             <recovery_mode>0</recovery_mode>
