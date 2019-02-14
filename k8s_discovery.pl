@@ -103,7 +103,7 @@ foreach my $config (@CONFIGS) {
 }
 
 # Report to Zabbix and print out discovery data
-(length @RESULT == 0) ? report_to_zabbix($ZABBIXKEY, 1) : report_to_zabbix($ZABBIXKEY, 0);
+(scalar @RESULT == 0) ? report_to_zabbix($ZABBIXKEY, 1) : report_to_zabbix($ZABBIXKEY, 0);
 print encode_json get_uniq();
 
 sub get_uniq {
@@ -113,7 +113,7 @@ sub get_uniq {
         my $key = "";
         
         if (defined $value->{'{#NAMESPACE}'}) {
-            $key .= $value->{'{#NAMESPACE}'} . '::' 
+            $key .= $value->{'{#NAMESPACE}'} . '::';
         }
         
         $key .= $value->{'{#NAME}'};
