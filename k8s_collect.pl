@@ -29,7 +29,7 @@ my @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES = (
 #########################################################
 
 my $HOSTNAME = $ARGV[0];
-my @CONFIGS = split /,/,$ARGV[1];
+my $CONFIG = $ARGV[1];
 my @NAMESPACES = split /,/,$ARGV[2].',none';
 
 #############################################
@@ -92,14 +92,12 @@ if ($respItems->is_success) {
 
 # Get data from Kubernetes
 my %collected_data;
-foreach my $config(@CONFIGS) {
-    $ENV{'KUBECONFIG'} = $config;
+$ENV{'KUBECONFIG'} = $CONFIG;
 
-    foreach my $kind ('pods', 'nodes', 'services', 'deployments', 'apiservices', 'componentstatuses') {
-        my $output = `$KUBECTL get $kind -o json --all-namespaces=true`;
-        my $outJson = decode_json $output;
-        push @{$collected_data{$kind}}, @{$outJson->{items}};
-    }
+foreach my $kind ('pods', 'nodes', 'services', 'deployments', 'apiservices', 'componentstatuses') {
+    my $output = `$KUBECTL get $kind -o json --all-namespaces=true`;
+    my $outJson = decode_json $output;
+    push @{$collected_data{$kind}}, @{$outJson->{items}};
 }
 
 # Item keys tokenizer
