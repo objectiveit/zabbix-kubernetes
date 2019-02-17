@@ -5,8 +5,7 @@ use JSON;
 use Data::Dumper;
 
 my $KUBECTL = "/usr/bin/kubectl";
-#$ENV{'KUBECONFIG'}
-my @CONFIGS = split /,/,$ARGV[0];
+my $CONFIG = $ARGV[0];
 my $DISCOVERY = $ARGV[1];
 my @NAMESPACES = split /,/,$ARGV[2] || undef;
 my $HOSTNAME = $ARGV[3];
@@ -28,77 +27,75 @@ my $ZABBIXKEY_NODATA_CLUSTERS = 'trap.k8s.discovery.nodata.nodes';
 my @RESULT;
 my $ZABBIXKEY;
 
-foreach my $config (@CONFIGS) {
-    $ENV{'KUBECONFIG'} = $config;
-    foreach my $ns (@NAMESPACES) {
-        if ($DISCOVERY eq 'clusters') {
-            my $output = `$KUBECTL config view -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_clusters($outJson);
+$ENV{'KUBECONFIG'} = $CONFIG;
+foreach my $ns (@NAMESPACES) {
+    if ($DISCOVERY eq 'clusters') {
+        my $output = `$KUBECTL config view -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_clusters($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_CLUSTERS;
-        }
-        elsif ($DISCOVERY eq 'apiservices') {
-            my $output = `$KUBECTL get apiservices -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_apiservices($outJson);
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_CLUSTERS;
+    }
+    elsif ($DISCOVERY eq 'apiservices') {
+        my $output = `$KUBECTL get apiservices -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_apiservices($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_APISERVICES;
-        }
-        elsif ($DISCOVERY eq 'componentstatuses') {
-            my $output = `$KUBECTL get componentstatuses -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_componentstatuses($outJson);
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_APISERVICES;
+    }
+    elsif ($DISCOVERY eq 'componentstatuses') {
+        my $output = `$KUBECTL get componentstatuses -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_componentstatuses($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_COMPONENTSTATUSES;
-        }
-        elsif ($DISCOVERY eq 'containers') {
-            my $output = `$KUBECTL get pods -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_containers($outJson);
-            
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_CONTAINERS;
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_COMPONENTSTATUSES;
+    }
+    elsif ($DISCOVERY eq 'containers') {
+        my $output = `$KUBECTL get pods -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_containers($outJson);
+        
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_CONTAINERS;
 
-            #print Dumper($result);
-        }
-        elsif ($DISCOVERY eq 'pods') {
-            my $output = `$KUBECTL get pods -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_pods($outJson);
+        #print Dumper($result);
+    }
+    elsif ($DISCOVERY eq 'pods') {
+        my $output = `$KUBECTL get pods -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_pods($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_PODS;
-            #print Dumper($result);
-        }
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_PODS;
+        #print Dumper($result);
+    }
 
-        elsif ($DISCOVERY eq 'nodes') {
-            my $output = `$KUBECTL get nodes -o json`;
-            my $outJson = decode_json $output;
-            my $result = discover_nodes($outJson);
+    elsif ($DISCOVERY eq 'nodes') {
+        my $output = `$KUBECTL get nodes -o json`;
+        my $outJson = decode_json $output;
+        my $result = discover_nodes($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_NODES;
-            #print Dumper($result);
-        }
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_NODES;
+        #print Dumper($result);
+    }
 
-        elsif ($DISCOVERY eq 'services') {
-            my $output = `$KUBECTL get services -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_services($outJson);
+    elsif ($DISCOVERY eq 'services') {
+        my $output = `$KUBECTL get services -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_services($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_SERVICES;
-            #print Dumper($result);
-        }
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_SERVICES;
+        #print Dumper($result);
+    }
 
-        elsif ($DISCOVERY eq 'deployments') {
-            my $output = `$KUBECTL get deployments -o json -n $ns`;
-            my $outJson = decode_json $output;
-            my $result = discover_deployments($outJson);
+    elsif ($DISCOVERY eq 'deployments') {
+        my $output = `$KUBECTL get deployments -o json -n $ns`;
+        my $outJson = decode_json $output;
+        my $result = discover_deployments($outJson);
 
-            $ZABBIXKEY = $ZABBIXKEY_NODATA_SERVICES;
-            #print Dumper($result);
-        }
-        else {
-            die "Only pods,services,deployments and containers are supported";
-        }
+        $ZABBIXKEY = $ZABBIXKEY_NODATA_SERVICES;
+        #print Dumper($result);
+    }
+    else {
+        die "Only pods,services,deployments and containers are supported";
     }
 }
 
