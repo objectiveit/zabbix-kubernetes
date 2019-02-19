@@ -129,6 +129,7 @@ foreach my $itemKey (@ITEMS) {
 
 # Send collected data to Zabbix
 send_to_zabbix($TMP_FILE_PATH,\%TO_ZABBIX);
+unlink $TMP_FILE_PATH;
 
 #########
 # Funcs #
