@@ -1,22 +1,24 @@
 #!/usr/bin/perl
 use strict;
 
+# use warnings;
+use 5.010;
+use JSON::RPC::Client;
 use JSON;
 use LWP::UserAgent;
-#use Data::Dumper;
+# use Data::Dumper;	# for debug
 
 # CONFIG ################################################
-my $APIURL = 'http://127.0.0.1/zabbix/api_jsonrpc.php';
-my $APIUSER = 'zabbixapi';
-my $APIPASS = 'zabbixapipass';
+my $APIURL = 'https://zabbix-server/api_jsonrpc.php';
+my $APIUSER = 'zbx';
+my $APIPASS = 'password';
 my $ZABBIX_SENDER = '/usr/bin/zabbix_sender';
 my $ZABBIX_SERVER = '127.0.0.1';
-my $ZABBIX_PORT = '10051';
+my $ZABBIX_PORT = '10051';	
 my $KUBECTL = '/usr/bin/kubectl';
 my $TMP_FILE_PATH = '/tmp/send_to_zabbix_'. int(rand(1000000000)) .'.data';
 
 # LANG TOKENS ###########################################
-my $ITEM_REGEXP = '^trap\.k8s\.';
 my $JSON_PATH_NO_VALUE = 'No value';
 #########################################################
 # ITEMS WITH POSSIBLE EMPTY VALUES
@@ -29,41 +31,47 @@ my @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES = (
 #########################################################
 
 my $HOSTNAME = $ARGV[0];
-my $CONFIG = $ARGV[1];
-my @NAMESPACES = split /,/,$ARGV[2].',none';
+my $CONFIG = $ARGV[1] || '/etc/zabbix/k8s.conf';
+my $NAMESPACE = $ARGV[2] || 'kube-system';
+my @NAMESPACES = split /,/,$NAMESPACE.',none';
 
 #############################################
 # Request to Zabbix API for data to collect #
 #############################################
 my $ID = 0;
-my $AUTH = '';
 my @ITEMS;
 my %COLLECTED_DATA;
 my %TO_ZABBIX;
 my %NAMESPACES_HASH = map {$_ => 1} @NAMESPACES;
 my %JSON_PATHS_W_POSSIBLE_EMPTY_VALUES = map {$_ => 1} @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES; 
-my $ua = LWP::UserAgent->new();
-$ua-> default_header('Content-Type' => 'application/json-rpc');
 # Auth ######################################
-my $authRequest = {
-    jsonrpc => '2.0',
-    method  => 'user.login',
-    params  => {
-        user        => $APIUSER,
-        password    => $APIPASS,
-    },
-    id      => ++$ID,
+# my $authRequest = (
+#     jsonrpc => '2.0',
+#     method  => 'user.login',
+#     params  => {
+#         user        => $APIUSER,
+#         password    => $APIPASS,
+#     },
+#     id      => ++$ID,
+# );
+my $authRequestJson = {
+	"jsonrpc" => "2.0",
+	"method" => "user.login",
+	"id" => ++$ID,
+	"params" => {"user" => $APIUSER,"password" => $APIPASS}
 };
-my $authRequestJson = encode_json $authRequest;
 
-my $respAuth = $ua->post($APIURL, Content => $authRequestJson);
-if ($respAuth->is_success) {
-    my $responseJson = decode_json $respAuth->content;
-    $AUTH = $responseJson->{result};
-    die "Zabbix API Authentication Error" if length $AUTH == 0;
-} else {
-    die "Zabbix API HTTP Connection Error";
-}
+my $respAuth;
+
+
+my $client = new JSON::RPC::Client;
+my $clientResponse;
+$clientResponse = $client->call($APIURL, $authRequestJson);
+
+die "Authentication failed\n" unless $clientResponse->content->{'result'};
+
+my $AUTH = $clientResponse->content->{'result'};
+
 # Get item list ##############################
 my $postBody = {
     jsonrpc => '2.0',
@@ -77,14 +85,11 @@ my $postBody = {
     id      => ++$ID,
     auth    => $AUTH
 };
-my $postBodyJson = encode_json $postBody;
-my $respItems = $ua->post($APIURL, Content => $postBodyJson);
-if ($respItems->is_success) {
-    my $responseJson = decode_json $respItems->content;
-    @ITEMS = map {$_->{key_}} @{$responseJson->{result}}
-} else {
-    die "Zabbix API HTTP Co nnection Error";
-}
+
+my $clientResponse2 = $client->call($APIURL, $postBody);
+die "Get items from zabbix failed\n" unless $clientResponse2->content->{'result'};
+
+@ITEMS = map {$_ ->{key_}}  @{$clientResponse2->content->{'result'}};
 
 ################
 # Collect data #
@@ -96,20 +101,23 @@ $ENV{'KUBECONFIG'} = $CONFIG;
 
 foreach my $kind ('pods', 'nodes', 'services', 'deployments', 'apiservices', 'componentstatuses') {
     my $output = `$KUBECTL get $kind -o json --all-namespaces=true`;
-    my $outJson = decode_json $output;
+    my $outJson = JSON::decode_json $output;
     push @{$collected_data{$kind}}, @{$outJson->{items}};
 }
 
+
 # Item keys tokenizer
+my $ITEM_REGEXP = '^trap\.k8s\.';
+
 foreach my $itemKey (@ITEMS) {
     my ($kind, $namespace, $name, $path) = $itemKey =~ m/$ITEM_REGEXP(.*)\[(.*),(.*),(.*)\]/;
+    next if (rindex($itemKey, "trap.k8s.", 0) != 0);
     next if (!defined $kind || !defined $name || !defined $path);
 
     my @path = split('\.',$path);
 
     my $dataOfKind = $collected_data{$kind};
     foreach my $element (@$dataOfKind) {
-        my $value;
 
         # if element has namespace, check if we really need this one and if its equal to current item
         if (defined $element->{metadata}->{namespace}) {
@@ -189,10 +197,12 @@ sub send_to_zabbix {
             my @isNoValueAllowed = grep {$to_z =~ /$_/} @JSON_PATHS_W_POSSIBLE_EMPTY_VALUES;
             next if (scalar @isNoValueAllowed > 0);
         }
-        print $fh "$HOSTNAME $to_z $to_zabbix->{$to_z}\n";
-        #print "$HOSTNAME $to_z $to_zabbix->{$to_z}\n";
+	my $key = $to_z;
+        print $fh "$HOSTNAME $key $to_zabbix->{$to_z}\n";
     }
     close $fh;
-    my $ret = system("$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath");
-    print $ret;
+    my $cmd = "$ZABBIX_SENDER -z $ZABBIX_SERVER -p $ZABBIX_PORT -i $tmpFilePath";
+    # print $cmd."\n";
+    my $ret = system($cmd);
+    print "Zabbix sender return status = ".$ret."\n";
 }
